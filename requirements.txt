@@ -1,0 +1,5 @@
+gtfs_kit
+pandas
+requests
+geopy
+shapely
