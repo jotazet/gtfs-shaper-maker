@@ -57,13 +57,15 @@ def fetch_shape(trip_id, stop_ids):
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            if data["code"] == "Ok":
+            if data.get("code") == "Ok" and "routes" in data:
                 # Access coordinates from the new API response structure
-                coordinates = data["route"][0]["geometry"]["coordinates"]
+                coordinates = data["routes"][0]["geometry"]["coordinates"]
                 filtered = [coordinates[0]] + coordinates[1:-1:3] + [coordinates[-1]]
                 return trip_id, filtered
-    except requests.exceptions.RequestException:
-        pass
+            else:
+                print(f"Unexpected API response: {data}")
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed for trip_id {trip_id}: {e}")
     return None
 
 # 8. Prepare list of tasks
