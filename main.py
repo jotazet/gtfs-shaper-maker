@@ -61,7 +61,6 @@ def fetch_shape(trip_id, stop_ids):
                 # Access coordinates from the new API response structure
                 coordinates = data["route"][0]["geometry"]["coordinates"]
                 filtered = [coordinates[0]] + coordinates[1:-1:3] + [coordinates[-1]]
-                print(filtered)
                 return trip_id, filtered
     except requests.exceptions.RequestException:
         pass
