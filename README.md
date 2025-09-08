@@ -16,7 +16,7 @@ This project consists of two separate components:
 
 ---
 
-## 🚉 OSRM Lua Profile for Trains
+## 🚉 Setup and run
 
 To get started, install the following dependencies:
 

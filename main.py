@@ -46,21 +46,23 @@ def fetch_shape(trip_id, stop_ids):
         if lat is None or lon is None:
             return None
         coords_list.append(f"{lon},{lat}")
-        radiuses_list.append("100")  # fixed radius for each point
-        approaches_list.append("unrestricted")
 
     coords = ";".join(coords_list)
     
-    url = f"http://localhost:5000/route/v1/train/{coords}?overview=full&geometries=geojson"
-
+    url = f"http://localhost:5000/match/v1/train/{coords}?overview=full&radiuses={radiuses}&geometries=geojson"
+    
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            if data.get("code") == "Ok" and "routes" in data:
-                # Access coordinates from the new API response structure
-                coordinates = data["routes"][0]["geometry"]["coordinates"]
-                filtered = [coordinates[0]] + coordinates[1:-1:3] + [coordinates[-1]]
+            if data.get("code") == "Ok" and "matchings" in data:
+                # Collect all geometries from matchings
+                all_coordinates = []
+                for matching in data["matchings"]:
+                    all_coordinates.extend(matching["geometry"]["coordinates"])
+                
+                # Filter coordinates to reduce the number of points
+                filtered = [all_coordinates[0]] + all_coordinates[1:-1:3] + [all_coordinates[-1]]
                 return trip_id, filtered
             else:
                 print(f"Unexpected API response: {data}")
