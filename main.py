@@ -38,8 +38,6 @@ stop_coords = {
 # 7. Function to fetch route shape from OSRM
 def fetch_shape(trip_id, stop_ids):
     coords_list = []
-    radiuses_list = []
-    approaches_list = []
 
     for stop_id in stop_ids:
         lat, lon = stop_coords.get(stop_id, (None, None))
@@ -49,7 +47,7 @@ def fetch_shape(trip_id, stop_ids):
 
     coords = ";".join(coords_list)
     
-    url = f"http://localhost:5000/match/v1/train/{coords}?overview=full&radiuses={radiuses}&geometries=geojson"
+    url = f"http://localhost:5000/match/v1/train/{coords}?overview=full&geometries=geojson"
     
     try:
         response = requests.get(url, timeout=5)
