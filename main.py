@@ -36,6 +36,19 @@ stop_coords = {
 }
 
 # 7. Function to fetch route shape from OSRM
+def get_route(start_coords, end_coords):
+    route_url = f"http://localhost:5000/route/v1/train/{start_coords};{end_coords}?overview=full&geometries=geojson"
+    response = requests.get(route_url, timeout=5)
+    if response.status_code == 200:
+        data = response.json()
+        if data.get("code") == "Ok" and "routes" in data:
+            # Access the first route in the list
+            if data["routes"]:
+                return data["routes"][0]["geometry"]["coordinates"]
+            else:
+                print("No routes found in the response.")
+    return None
+
 def fetch_shape(trip_id, stop_ids):
     coords_list = []
 
@@ -46,9 +59,9 @@ def fetch_shape(trip_id, stop_ids):
         coords_list.append(f"{lon},{lat}")
 
     coords = ";".join(coords_list)
-    
+
     url = f"http://localhost:5000/match/v1/train/{coords}?overview=full&geometries=geojson"
-    
+
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
@@ -56,14 +69,53 @@ def fetch_shape(trip_id, stop_ids):
             if data.get("code") == "Ok" and "matchings" in data:
                 # Collect all geometries from matchings
                 all_coordinates = []
-                for matching in data["matchings"]:
+
+                previous_end_coords = None
+                for i, matching in enumerate(data["matchings"]):
+                    # Handle gap at the beginning
+                    if i == 0:
+                        first_matching_start = f"{matching['geometry']['coordinates'][0][0]},{matching['geometry']['coordinates'][0][1]}"
+                        if coords_list[0] != first_matching_start:
+                            route_coords = get_route(coords_list[0], first_matching_start)
+                            if route_coords is not None:
+                                all_coordinates.extend(route_coords)
+
+                    # If there is a gap, fill it using get_route
+                    if previous_end_coords is not None:
+                        start_coords = f"{matching['geometry']['coordinates'][0][0]},{matching['geometry']['coordinates'][0][1]}"
+                        route_coords = get_route(previous_end_coords, start_coords)
+                        if route_coords is not None:
+                            all_coordinates.extend(route_coords)
+
+                    # Add current matching coordinates
                     all_coordinates.extend(matching["geometry"]["coordinates"])
-                
+
+                    # Update previous_end_coords to the last point of the current matching
+                    previous_end_coords = f"{matching['geometry']['coordinates'][-1][0]},{matching['geometry']['coordinates'][-1][1]}"
+
+                # Handle gap at the end
+                last_matching_end = previous_end_coords
+                if last_matching_end and coords_list[-1] != last_matching_end:
+                    route_coords = get_route(last_matching_end, coords_list[-1])
+                    if route_coords is not None:
+                        all_coordinates.extend(route_coords)
+
                 # Filter coordinates to reduce the number of points
                 filtered = [all_coordinates[0]] + all_coordinates[1:-1:3] + [all_coordinates[-1]]
                 return trip_id, filtered
             else:
                 print(f"Unexpected API response: {data}")
+        else:
+            # Attempt to fetch the route directly
+            if len(coords_list) >= 2:
+                start_coords = coords_list[0]
+                end_coords = coords_list[-1]
+                route_coords = get_route(start_coords, end_coords)
+                if route_coords is not None:
+                    # Filter coordinates to reduce the number of points
+                    filtered = [route_coords[0]] + route_coords[1:-1:3] + [route_coords[-1]]
+                    return trip_id, filtered
+
     except requests.exceptions.RequestException as e:
         print(f"Request failed for trip_id {trip_id}: {e}")
     return None
@@ -83,7 +135,7 @@ for trip_id, group in train_stop_times.groupby('trip_id'):
 all_shapes = []
 shape_id = 0
 
-with ThreadPoolExecutor(max_workers=10) as executor:
+with ThreadPoolExecutor(max_workers=12) as executor:
     futures = [executor.submit(fetch_shape, *task) for task in tasks]
     for future in as_completed(futures):
         result = future.result()
